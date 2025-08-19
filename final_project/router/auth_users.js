@@ -83,7 +83,30 @@ regd_users.put("/auth/review/:isbn", (req, res) => {
     return res.status(404).json({ message: "Book not found." });
   }
 });
-
+regd_users.delete("/auth/review/:isbn", (req, res) => {
+    // 1. 从 URL 参数中获取 ISBN
+    const isbn = req.params.isbn;
+    // 2. 从 session 中获取当前登录的用户名
+    const username = req.session.authorization.username;
+  
+    // 3. 检查这本书是否存在
+    if (books[isbn]) {
+      // 4. 检查这本书的评论区里，是否存在当前用户的评论
+      if (books[isbn].reviews[username]) {
+        // 5. 如果存在，就删除该用户的评论
+        delete books[isbn].reviews[username];
+        
+        // 6. 返回成功的消息
+        return res.status(200).json({ message: "Your review for the book has been successfully deleted." });
+      } else {
+        // 如果这本书存在，但该用户没有发表过评论
+        return res.status(404).json({ message: "Review not found for the current user." });
+      }
+    } else {
+      // 如果这本书本身就不存在
+      return res.status(404).json({ message: "Book with the specified ISBN not found." });
+    }
+  });
 module.exports.authenticated = regd_users;
 module.exports.isValid = isValid;
 module.exports.users = users;
