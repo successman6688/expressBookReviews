@@ -4,97 +4,125 @@ let isValid = require("./auth_users.js").isValid;
 let users = require("./auth_users.js").users;
 const public_users = express.Router();
 
-
-public_users.post("/register", (req,res) =>  {
-    const username = req.body.username;
-    const password = req.body.password;
-    // Check if both username and password are provided
-    if (username && password) {
-        // Check if the user does not already exist
-        if (!doesExist(username)) {
-            // Add the new user to the users array
-            users.push({"username": username, "password": password});
-            return res.status(200).json({message: "User successfully registered. Now you can login"});
-        } else {
-            return res.status(404).json({message: "User already exists!"});
-        }
-    }
-    // Return error if username or password is missing
-    return res.status(404).json({message: "Unable to register user."});
-});
-
-// Get the book list available in the shop
-// Get the book list available in the shop
+const fetchAllBooks = () => {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => resolve(books), 100);
+    });
+};
 public_users.get('/', function (req, res) {
-  // The JSON.stringify method converts the 'books' JavaScript object into a JSON string.
-  // The arguments (null, 4) format the JSON string with an indentation of 4 spaces for readability.
-  res.status(200).send(JSON.stringify(books, null, 4));
+  fetchAllBooks()
+    .then(
+      // 成功时的回调函数
+      (allBooks) => {
+        return res.status(200).json(allBooks);
+      }
+    )
+    .catch(
+      // 失败时的回调函数
+      (error) => {
+        return res.status(500).json({ message: "An error occurred while fetching books." });
+      }
+    );
 });
-// Get book details based on ISBN
-public_users.get('/isbn/:isbn', function (req, res) {
-  // Retrieve the ISBN from the request's URL parameters
-  const isbn = req.params.isbn;
 
-  // Check if a book exists with the given ISBN as a key
-  if (books[isbn]) {
-    // If the book is found, send its details as a JSON response with a 200 OK status
-    return res.status(200).json(books[isbn]);
-  } else {
-    // If the book is not found, send a 404 Not Found status with an error message
-    return res.status(404).json({ message: "Book not found" });
-  }
+// Get book details based on ISBN (Promise Chain)
+const fetchBookByIsbn = (isbn) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (books[isbn]) {
+                resolve(books[isbn]);
+            } else {
+                reject({ status: 404, message: "Book not found" });
+            }
+        }, 100);
+    });
+};
+public_users.get('/isbn/:isbn', function (req, res) {
+  const isbn = req.params.isbn;
+  fetchBookByIsbn(isbn)
+    .then(
+      // 成功时的回调函数，接收找到的书籍
+      (book) => {
+        return res.status(200).json(book);
+      }
+    )
+    .catch(
+      // 失败时的回调函数，接收 reject 时的错误对象
+      (error) => {
+        return res.status(error.status || 500).json({ message: error.message });
+      }
+    );
 });
-// Get book details based on ISBN
+
+// Get book details based on Author (Promise Chain)
+const fetchBooksByAuthor = (author) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const matchingBooks = [];
+            for (const key in books) {
+                if (books[key].author === author) {
+                    matchingBooks.push(books[key]);
+                }
+            }
+            resolve(matchingBooks);
+        }, 100);
+    });
+}
 public_users.get('/author/:author', function (req, res) {
   const author = req.params.author;
-  const authorBooks = [];
-  // Get all the keys for the 'books' object
-  const bookKeys = Object.keys(books);
-  // Iterate through the 'books' array & check if the author matches
-  for (const key of bookKeys) {
-    if (books[key].author === author) {
-      // If a match is found, add the book to the results
-      authorBooks.push(books[key]);
-    }
-  }
-  // If books by the author are found, send the list; otherwise, send a not found message
-  if (authorBooks.length > 0) {
-    res.status(200).json(authorBooks);
-  } else {
-    res.status(404).json({ message: "No books found by this author" });
-  }
+  fetchBooksByAuthor(author)
+    .then(
+      // 成功时的回调函数，接收匹配的书籍数组
+      (authorBooks) => {
+        if (authorBooks.length > 0) {
+          return res.status(200).json(authorBooks);
+        } else {
+          // 注意：没有找到结果不是一个程序错误，所以在这里处理
+          return res.status(404).json({ message: "No books found by this author" });
+        }
+      }
+    )
+    .catch(
+      // 失败时的回调函数，处理意外的程序错误
+      (error) => {
+        return res.status(500).json({ message: "An error occurred while searching by author." });
+      }
+    );
 });
 
-// Get all books based on title
+// Get all books based on Title (Promise Chain)
+const fetchBooksByTitle = (title) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const matchingBooks = [];
+            for (const key in books) {
+                if (books[key].title === title) {
+                    matchingBooks.push(books[key]);
+                }
+            }
+            resolve(matchingBooks);
+        }, 100);
+    });
+};
 public_users.get('/title/:title', function (req, res) {
   const title = req.params.title;
-  const titleBooks = [];
-  const bookKeys = Object.keys(books);
-  // Iterate through the 'books' array & check if the title matches
-  for (const key of bookKeys) {
-    if (books[key].title === title) {
-      titleBooks.push(books[key]);
-    }
-  }
-  // If books with the title are found, send the list; otherwise, send a not found message
-  if (titleBooks.length > 0) {
-    res.status(200).json(titleBooks);
-  } else {
-    res.status(404).json({ message: "No books found with this title" });
-  }
-});
-
-//  Get book review
-public_users.get('/review/:isbn', function (req, res) {
-  const isbn = req.params.isbn;
-  // Check if a book with the given ISBN exists
-  if (books[isbn]) {
-    // If the book is found, send its reviews with a 200 OK status
-    res.status(200).json(books[isbn].reviews);
-  } else {
-    // If no book is found for the ISBN, send a 404 Not Found status
-    res.status(404).json({ message: "Book not found" });
-  }
+  fetchBooksByTitle(title)
+    .then(
+      // 成功时的回调函数
+      (titleBooks) => {
+        if (titleBooks.length > 0) {
+          return res.status(200).json(titleBooks);
+        } else {
+          return res.status(404).json({ message: "No books found with this title" });
+        }
+      }
+    )
+    .catch(
+      // 失败时的回调函数
+      (error) => {
+        return res.status(500).json({ message: "An error occurred while searching by title." });
+      }
+    );
 });
 
 module.exports.general = public_users;
